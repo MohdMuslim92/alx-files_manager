@@ -1,8 +1,9 @@
 import sha1 from 'sha1';
+import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 
 const UsersController = {
-  async postNew (req, res) {
+  async postNew(req, res) {
     const { email, password } = req.body;
 
     if (!email) {
@@ -24,7 +25,31 @@ const UsersController = {
     const result = await dbClient.db.collection('users').insertOne(newUser);
 
     return res.status(201).json({ id: result.insertedId, email });
-  }
+  },
+
+  async getMe(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const user = await dbClient.db.collection('users').findOne({ _id: userId });
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { email, _id } = user;
+      return res.status(200).json({ email, id: _id });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  },
 };
 
 export default UsersController;
