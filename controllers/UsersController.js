@@ -1,6 +1,7 @@
 import sha1 from 'sha1';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
+import { userQueue } from '../worker';
 
 const UsersController = {
   async postNew(req, res) {
@@ -23,6 +24,9 @@ const UsersController = {
     const newUser = { email, password: hashedPassword };
 
     const result = await dbClient.db.collection('users').insertOne(newUser);
+
+    // Add job to the queue for sending welcome email
+    await userQueue.add({ userId: result.insertedId });
 
     return res.status(201).json({ id: result.insertedId, email });
   },
