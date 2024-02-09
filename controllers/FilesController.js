@@ -164,6 +164,7 @@ const FilesController = {
 
   async getFile(req, res) {
     const fileId = req.params.id;
+    const { size } = req.query;
 
     const file = await dbClient.db.collection('files').findOne({ _id: fileId });
     if (!file) {
@@ -182,12 +183,24 @@ const FilesController = {
       return res.status(400).json({ error: "A folder doesn't have content" });
     }
 
-    if (!fs.existsSync(file.localPath)) {
+    // Check if the file is an image
+    if (file.type !== 'image') {
+      return res.status(400).json({ error: 'Requested file is not an image' });
+    }
+
+    const validSizes = [500, 250, 100];
+    if (size && !validSizes.includes(Number(size))) {
+      return res.status(400).json({ error: 'Invalid size parameter' });
+    }
+
+    const imagePath = size ? `${file.localPath}_${size}` : file.localPath;
+
+    if (!fs.existsSync(imagePath)) {
       return res.status(404).json({ error: 'Not found' });
     }
 
     const mimeType = mimeTypes.lookup(file.name);
-    const fileData = fs.readFileSync(file.localPath);
+    const fileData = fs.readFileSync(imagePath);
 
     res.setHeader('Content-Type', mimeType);
     return res.send(fileData);
